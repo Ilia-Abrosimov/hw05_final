@@ -45,3 +45,21 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ('created',)
+
+
+class Follow(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name="follower",
+                             verbose_name='Подписчик',
+                             help_text="Подписчик")
+    author = models.ForeignKey(User, on_delete=models.CASCADE,
+                               related_name="following",
+                               verbose_name='Автор',
+                               help_text="Автор")
+
+    class Meta:
+        db_table = 'posts_follow'
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'author'],
+                                    name='unique posts_follow')
+        ]
