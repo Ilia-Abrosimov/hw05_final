@@ -52,7 +52,9 @@ def profile(request, username):
     paginator = Paginator(author.posts.all(), 10)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
-    following = request.user.follower.filter(author=author).exists()
+    following = False
+    if request.user.is_authenticated and request.user != author:
+        following = request.user.follower.filter(author=author).exists()
     return render(request,
                   'profile.html',
                   {'author': author,
@@ -67,7 +69,9 @@ def post_view(request, username, post_id):
     count = author.posts.count()
     form = CommentForm()
     items = post.comments.all()
-    following = request.user.follower.filter(author=author).exists()
+    following = False
+    if request.user.is_authenticated and request.user != author:
+        following = request.user.follower.filter(author=author).exists()
     return render(request,
                   'post.html', {'post': post, 'author': author, 'count': count,
                                 'form': form, 'items': items, 'following': following})
@@ -106,6 +110,7 @@ def server_error(request):
     return render(request, "misc/500.html", status=500)
 
 
+@login_required
 def add_comment(request, username, post_id):
     post = get_object_or_404(Post, pk=post_id, author__username=username)
     form = CommentForm(request.POST or None)
@@ -115,7 +120,8 @@ def add_comment(request, username, post_id):
         comment.author = request.user
         comment.save()
         return redirect('post', username=username, post_id=post_id)
-    return render(request, 'comments.html', {'form': form})
+    return render(request, 'comments.html', {'form': form,
+                                             'post': post})
 
 
 @login_required
