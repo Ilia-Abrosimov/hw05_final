@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.views.decorators.cache import cache_page
 
+
 @cache_page(20, key_prefix='index_page')
 def index(request):
     post_list = Post.objects.order_by('-pub_date').all()
@@ -74,7 +75,8 @@ def post_view(request, username, post_id):
         following = request.user.follower.filter(author=author).exists()
     return render(request,
                   'post.html', {'post': post, 'author': author, 'count': count,
-                                'form': form, 'items': items, 'following': following})
+                                'form': form, 'items': items,
+                                'following': following})
 
 
 @login_required
@@ -97,7 +99,7 @@ def post_edit(request, username, post_id):
     return redirect('post', username=username, post_id=post.id)
 
 
-def page_not_found(request, exception):
+def page_not_found(request):
     return render(
         request,
         "misc/404.html",
@@ -126,8 +128,10 @@ def add_comment(request, username, post_id):
 
 @login_required
 def follow_index(request):
-    user_follows = Follow.objects.select_related('author').filter(user=request.user).values_list("author")
-    post_list = Post.objects.filter(author__in=user_follows).order_by("-pub_date")
+    user_follows = Follow.objects.select_related('author')\
+        .filter(user=request.user).values_list("author")
+    post_list = Post.objects.filter(author__in=user_follows)\
+        .order_by("-pub_date")
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)

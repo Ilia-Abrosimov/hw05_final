@@ -144,9 +144,7 @@ class HW05Test(TestCase):
                                              {'text': 'post with image',
                                               'group': self.group.id,
                                               'image': img},
-                                             follow=True
-            )
-            #self.assertEqual(response.status_code, 200)
+                                             follow=True)
             self.assertNotContains(response, '<img')
 
     def test_cache(self):
@@ -157,6 +155,7 @@ class HW05Test(TestCase):
         self.assertContains(response, "cache check")
         self.auth_client.post(
             reverse('new_post'),
-            data={"text": "2nd cache check", "group": self.group.id}, follow=True)
+            data={"text": "2nd cache check",
+                  "group": self.group.id}, follow=True)
         response = self.auth_client.get(reverse('index'))
         self.assertNotContains(response, "2nd cache check")
