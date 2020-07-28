@@ -99,7 +99,7 @@ def post_edit(request, username, post_id):
     return redirect('post', username=username, post_id=post.id)
 
 
-def page_not_found(request):
+def page_not_found(request, exception):
     return render(
         request,
         "misc/404.html",

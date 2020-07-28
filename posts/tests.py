@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, Client
-from posts.models import Post, Group
+from posts.models import Post, Group, Follow
 from django.urls import reverse
 from django.core.cache import cache
 
@@ -104,6 +104,9 @@ class HW05Test(TestCase):
         self.auth_client = Client()
         self.auth_user = User.objects.create_user(username=self.name)
         self.auth_client.force_login(self.auth_user)
+        self.auth_client_follower = Client()
+        self.auth_user_follower = User.objects.create_user(username='Follower')
+        self.auth_client_follower.force_login(self.auth_user_follower)
         self.group = Group.objects.create(
             title='This is test group',
             slug='test_group',
@@ -159,3 +162,53 @@ class HW05Test(TestCase):
                   "group": self.group.id}, follow=True)
         response = self.auth_client.get(reverse('index'))
         self.assertNotContains(response, "2nd cache check")
+
+    def test_auth_user_subscribe_unsubscribe(self):
+        before_subscribe = Follow.objects.count()
+        self.auth_client_follower.get(
+            reverse('profile_follow',
+                    kwargs={'username': self.name}),
+            data={'username': self.auth_user_follower.username})
+        after_subscribe = Follow.objects.count()
+        self.assertEqual(before_subscribe + 1, after_subscribe)
+        self.auth_client_follower.get(
+            reverse('profile_unfollow',
+                    kwargs={'username': self.name}),
+            data={'username': self.auth_user_follower.username})
+        after_unsubscribe = Follow.objects.count()
+        self.assertEqual(before_subscribe, after_unsubscribe)
+
+    def test_check_subscribe(self):
+        self.auth_client_notfollower = Client()
+        self.auth_user_notfollower = User.objects.\
+            create_user(username='Notfollower')
+        self.auth_client_notfollower.force_login(self.auth_user_notfollower)
+
+        self.auth_client_follower.get(
+            reverse('profile_follow',
+                    kwargs={'username': self.name}),
+            data={'username': self.auth_user_follower.username})
+
+        self.auth_client.post(
+            reverse('new_post'),
+            data={"text": "Test post", "group": self.group.id}, follow=True)
+
+        response_follower = self.auth_client_follower.\
+            get(reverse('follow_index'))
+        self.assertContains(response_follower, "Test post")
+        response_notfollower = self.auth_client_notfollower.\
+            get(reverse('follow_index'))
+        self.assertNotContains(response_notfollower, "Test post")
+
+    def test_comment(self):
+        post = self.create_post(text='This is test post', group=self.group,
+                                author=self.auth_user)
+
+        self.auth_client.post(
+            reverse('add_comment',
+                    kwargs={'username': self.name, 'post_id': post.id}),
+            data={'text': 'Test comment'})
+        response = self.auth_client.get(reverse('post',
+                                                kwargs={'username': self.name,
+                                                        'post_id': post.id}))
+        self.assertContains(response, "Test comment")
