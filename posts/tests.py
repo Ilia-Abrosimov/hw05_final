@@ -6,20 +6,20 @@ from django.core.cache import cache
 
 
 class CreateUserTest(TestCase):
-    name = 'AuthTestUser'
+    Name = 'AuthTestUser'
 
     def create_post(self, text, group, author):
-        return(Post.objects.create(
+        return Post.objects.create(
             text=text,
             group=group,
             author=author
-        ))
+        )
 
     def setUp(self):
         self.auth_client = Client()
         self.not_Auth_client = Client()
         self.auth_user = User.objects.create_user(
-            username=self.name
+            username=self.Name
         )
         self.auth_client.force_login(self.auth_user)
         self.group = Group.objects.create(
@@ -30,7 +30,7 @@ class CreateUserTest(TestCase):
 
     def test_personal_page(self):
         response = self.auth_client.get(
-            reverse('profile', kwargs={'username': self.name})
+            reverse('profile', kwargs={'username': self.Name})
         )
         self.assertEqual(response.status_code, 200)
 
@@ -64,45 +64,53 @@ class CreateUserTest(TestCase):
                                 author=self.auth_user)
 
         for url in (reverse('index'),
-                    reverse('profile', kwargs={'username': self.name}),
-                    reverse('post', kwargs={'username': self.name,
+                    reverse('profile', kwargs={'username': self.Name}),
+                    reverse('post', kwargs={'username': self.Name,
                                             'post_id': post.id})):
+            with self.subTest(i=url):
 
-            self.check_pages(url=url, text='This is test post',
-                             user=self.auth_user, group=self.group)
+                self.check_pages(url=url, text='This is test post',
+                                 user=self.auth_user, group=self.group)
 
     def test_post_edit(self):
         post = self.create_post(text='This is test post', group=self.group,
                                 author=self.auth_user)
 
         self.auth_client.get(
-            reverse('post_edit', kwargs={'username': self.name,
+            reverse('post_edit', kwargs={'username': self.Name,
                                          'post_id': post.id})
         )
         post.text = 'Changed text'
         post.save()
         for url in (reverse('index'),
-                    reverse('profile', kwargs={'username': self.name}),
-                    reverse('post', kwargs={'username': self.name,
+                    reverse('profile', kwargs={'username': self.Name}),
+                    reverse('post', kwargs={'username': self.Name,
                                             'post_id': post.id})):
             cache.clear()
-            self.check_pages(url=url, text='Changed text',
-                             user=self.auth_user, group=self.group)
+            with self.subTest(i=url):
+                self.check_pages(url=url, text='Changed text',
+                                 user=self.auth_user, group=self.group)
 
 
 class HW05Test(TestCase):
-    name = 'AuthTestUser'
+    Name = 'AuthTestUser'
 
     def create_post(self, text, group, author):
-        return (Post.objects.create(
+        return Post.objects.create(
             text=text,
             group=group,
             author=author
-        ))
+        )
+
+    def subscribe(self, user, author):
+        return Follow.objects.create(
+            user=user,
+            author=author
+        )
 
     def setUp(self):
         self.auth_client = Client()
-        self.auth_user = User.objects.create_user(username=self.name)
+        self.auth_user = User.objects.create_user(username=self.Name)
         self.auth_client.force_login(self.auth_user)
         self.auth_client_follower = Client()
         self.auth_user_follower = User.objects.create_user(username='Follower')
@@ -124,18 +132,18 @@ class HW05Test(TestCase):
             post.image.save(img.name, img)
             response = self.auth_client.get(reverse
                                             ('post',
-                                             kwargs={'username': self.name,
+                                             kwargs={'username': self.Name,
                                                      'post_id': post.id}))
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, '<img')
 
-    def test_3pages(self):
+    def test_index_profile_group(self):
         with open('media/posts/file.jpg', 'rb') as img:
             post = self.create_post(text='post with image', group=self.group,
                                     author=self.auth_user)
             post.image.save(img.name, img)
             for url in (reverse('index'),
-                        reverse('profile', kwargs={'username': self.name}),
+                        reverse('profile', kwargs={'username': self.Name}),
                         reverse('group', kwargs={'slug': self.group.slug})):
                 cache.clear()
                 response = self.auth_client.get(url)
@@ -163,40 +171,36 @@ class HW05Test(TestCase):
         response = self.auth_client.get(reverse('index'))
         self.assertNotContains(response, "2nd cache check")
 
-    def test_auth_user_subscribe_unsubscribe(self):
+    def test_auth_user_subscribe(self):
         before_subscribe = Follow.objects.count()
-        self.auth_client_follower.get(
-            reverse('profile_follow',
-                    kwargs={'username': self.name}),
-            data={'username': self.auth_user_follower.username})
+        self.subscribe(user=self.auth_user_follower, author=self.auth_user)
         after_subscribe = Follow.objects.count()
         self.assertEqual(before_subscribe + 1, after_subscribe)
+
+    def test_auth_user_unsubscribe(self):
+        before_unsubscribe = Follow.objects.count()
+        self.subscribe(user=self.auth_user_follower, author=self.auth_user)
         self.auth_client_follower.get(
             reverse('profile_unfollow',
-                    kwargs={'username': self.name}),
+                    kwargs={'username': self.Name}),
             data={'username': self.auth_user_follower.username})
         after_unsubscribe = Follow.objects.count()
-        self.assertEqual(before_subscribe, after_unsubscribe)
+        self.assertEqual(before_unsubscribe, after_unsubscribe)
 
-    def test_check_subscribe(self):
-        self.auth_client_notfollower = Client()
-        self.auth_user_notfollower = User.objects.\
-            create_user(username='Notfollower')
-        self.auth_client_notfollower.force_login(self.auth_user_notfollower)
-
-        self.auth_client_follower.get(
-            reverse('profile_follow',
-                    kwargs={'username': self.name}),
-            data={'username': self.auth_user_follower.username})
-
+    def test_follower_update_post(self):
+        self.subscribe(user=self.auth_user_follower, author=self.auth_user)
         self.auth_client.post(
             reverse('new_post'),
             data={"text": "Test post", "group": self.group.id}, follow=True)
-
         response_follower = self.auth_client_follower.\
             get(reverse('follow_index'))
         self.assertContains(response_follower, "Test post")
-        response_notfollower = self.auth_client_notfollower.\
+
+    def test_notfollower_update_post(self):
+        self.auth_client.post(
+            reverse('new_post'),
+            data={"text": "Test post", "group": self.group.id}, follow=True)
+        response_notfollower = self.auth_client_follower.\
             get(reverse('follow_index'))
         self.assertNotContains(response_notfollower, "Test post")
 
@@ -206,9 +210,9 @@ class HW05Test(TestCase):
 
         self.auth_client.post(
             reverse('add_comment',
-                    kwargs={'username': self.name, 'post_id': post.id}),
+                    kwargs={'username': self.Name, 'post_id': post.id}),
             data={'text': 'Test comment'})
         response = self.auth_client.get(reverse('post',
-                                                kwargs={'username': self.name,
+                                                kwargs={'username': self.Name,
                                                         'post_id': post.id}))
         self.assertContains(response, "Test comment")

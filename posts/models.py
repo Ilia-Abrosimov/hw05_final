@@ -32,7 +32,7 @@ class Comment(models.Model):
     post = models.ForeignKey(Post,
                              on_delete=models.SET_NULL,
                              related_name="comments", blank=True, null=True,
-                             verbose_name="Комментарий к посту",
+                             verbose_name="Пост",
                              help_text="Добавьте комментарий к посту")
     author = models.ForeignKey(User, on_delete=models.CASCADE,
                                verbose_name="Автор комментария",
@@ -45,6 +45,7 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ('created',)
+        verbose_name_plural = 'Комментарии'
 
 
 class Follow(models.Model):
@@ -59,7 +60,4 @@ class Follow(models.Model):
 
     class Meta:
         db_table = 'posts_follow'
-        constraints = [
-            models.UniqueConstraint(fields=['user', 'author'],
-                                    name='unique posts_follow')
-        ]
+        unique_together = ['user', 'author']
