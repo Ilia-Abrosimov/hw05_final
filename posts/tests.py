@@ -1,5 +1,11 @@
+import io
+import tempfile
+from unittest import mock
+from django.core.files import File
+from PIL import Image
 from django.contrib.auth.models import User
-from django.test import TestCase, Client
+from django.core.files.base import ContentFile
+from django.test import TestCase, Client, override_settings
 from posts.models import Post, Group, Follow
 from django.urls import reverse
 from django.core.cache import cache
@@ -92,7 +98,7 @@ class CreateUserTest(TestCase):
                                  user=self.auth_user, group=self.group)
 
 
-class HW05Test(TestCase):
+class ImageSubscribeCommentCacheTest(TestCase):
     Name = 'AuthTestUser'
 
     def create_post(self, text, group, author):
@@ -126,37 +132,59 @@ class HW05Test(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_pictures(self):
-        with open('media/posts/file.jpg', 'rb') as img:
-            post = self.create_post(text='post with image', group=self.group,
-                                    author=self.auth_user)
-            post.image.save(img.name, img)
-            response = self.auth_client.get(reverse
-                                            ('post',
-                                             kwargs={'username': self.Name,
-                                                     'post_id': post.id}))
-            self.assertEqual(response.status_code, 200)
-            self.assertContains(response, '<img')
-
-    def test_index_profile_group(self):
-        with open('media/posts/file.jpg', 'rb') as img:
-            post = self.create_post(text='post with image', group=self.group,
-                                    author=self.auth_user)
-            post.image.save(img.name, img)
-            for url in (reverse('index'),
-                        reverse('profile', kwargs={'username': self.Name}),
-                        reverse('group', kwargs={'slug': self.group.slug})):
-                cache.clear()
-                response = self.auth_client.get(url)
+        with tempfile.TemporaryDirectory() as temp_directory:
+            with override_settings(MEDIA_ROOT=temp_directory):
+                byte_image = io.BytesIO()
+                im = Image.new("RGB", size=(500, 500), color=(255, 0, 0, 0))
+                im.save(byte_image, format='jpeg')
+                byte_image.seek(0)
+                data = {'text': 'post with image',
+                        'image': ContentFile(byte_image.read(),
+                                             name='test.jpeg')}
+                response = self.auth_client.post(
+                    reverse('new_post'),
+                    data=data,
+                    follow=True)
+                self.assertEqual(response.status_code, 200)
                 self.assertContains(response, '<img')
 
+    def test_pages_index_profile_group(self):
+        with tempfile.TemporaryDirectory() as temp_directory:
+            with override_settings(MEDIA_ROOT=temp_directory):
+                byte_image = io.BytesIO()
+                im = Image.new("RGB", size=(500, 500), color=(255, 0, 0, 0))
+                im.save(byte_image, format='jpeg')
+                byte_image.seek(0)
+                data = {'text': 'post with image',
+                        'group': self.group.id,
+                        'image': ContentFile(byte_image.read(),
+                                             name='test.jpeg')}
+                self.auth_client.post(
+                    reverse('new_post'),
+                    data=data,
+                    follow=True)
+                for url in (reverse('index'),
+                            reverse('profile', kwargs={'username': self.Name}),
+                            reverse('group', kwargs={'slug': self.group.slug})):
+                    cache.clear()
+                    response = self.auth_client.get(url)
+                    with self.subTest(i=url):
+                        self.assertEqual(response.status_code, 200)
+                        self.assertContains(response, '<img')
+
     def test_upload_wrong_file(self):
-        with open('media/posts/wrong.txt', 'rb') as img:
-            response = self.auth_client.post(reverse('new_post'),
-                                             {'text': 'post with image',
-                                              'group': self.group.id,
-                                              'image': img},
-                                             follow=True)
-            self.assertNotContains(response, '<img')
+        file_mock = mock.MagicMock(spec=File, name='wrong.txt')
+        response = self.auth_client.post(reverse('new_post'),
+                                         {'text': 'post with image',
+                                          'group': self.group.id,
+                                          'image': file_mock},
+                                         follow=True)
+        self.assertFormError(
+            response,
+            form='form', field='image',
+            errors='Загрузите правильное изображение.'
+                   ' Файл, который вы загрузили, '
+                   'поврежден или не является изображением.')
 
     def test_cache(self):
         self.auth_client.post(
