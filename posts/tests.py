@@ -12,7 +12,7 @@ from django.core.cache import cache
 
 
 class CreateUserTest(TestCase):
-    Name = 'AuthTestUser'
+    NAME = 'AuthTestUser'
 
     def create_post(self, text, group, author):
         return Post.objects.create(
@@ -23,9 +23,9 @@ class CreateUserTest(TestCase):
 
     def setUp(self):
         self.auth_client = Client()
-        self.not_Auth_client = Client()
+        self.not_auth_client = Client()
         self.auth_user = User.objects.create_user(
-            username=self.Name
+            username=self.NAME
         )
         self.auth_client.force_login(self.auth_user)
         self.group = Group.objects.create(
@@ -36,7 +36,7 @@ class CreateUserTest(TestCase):
 
     def test_personal_page(self):
         response = self.auth_client.get(
-            reverse('profile', kwargs={'username': self.Name})
+            reverse('profile', kwargs={'username': self.NAME})
         )
         self.assertEqual(response.status_code, 200)
 
@@ -47,7 +47,7 @@ class CreateUserTest(TestCase):
         self.assertTrue(Post.objects.filter(text='This is test post').exists())
 
     def test_not_auth_user_make_post(self):
-        response = self.not_Auth_client.post(
+        response = self.not_auth_client.post(
             reverse('new_post'), kwargs={'text': 'This is test post',
                                          "group": self.group.id})
         self.assertRedirects(response, '/auth/login/?next=/new/',
@@ -70,8 +70,8 @@ class CreateUserTest(TestCase):
                                 author=self.auth_user)
 
         for url in (reverse('index'),
-                    reverse('profile', kwargs={'username': self.Name}),
-                    reverse('post', kwargs={'username': self.Name,
+                    reverse('profile', kwargs={'username': self.NAME}),
+                    reverse('post', kwargs={'username': self.NAME,
                                             'post_id': post.id})):
             with self.subTest(i=url):
 
@@ -83,14 +83,14 @@ class CreateUserTest(TestCase):
                                 author=self.auth_user)
 
         self.auth_client.get(
-            reverse('post_edit', kwargs={'username': self.Name,
+            reverse('post_edit', kwargs={'username': self.NAME,
                                          'post_id': post.id})
         )
         post.text = 'Changed text'
         post.save()
         for url in (reverse('index'),
-                    reverse('profile', kwargs={'username': self.Name}),
-                    reverse('post', kwargs={'username': self.Name,
+                    reverse('profile', kwargs={'username': self.NAME}),
+                    reverse('post', kwargs={'username': self.NAME,
                                             'post_id': post.id})):
             cache.clear()
             with self.subTest(i=url):
@@ -99,7 +99,7 @@ class CreateUserTest(TestCase):
 
 
 class ImageSubscribeCommentCacheTest(TestCase):
-    Name = 'AuthTestUser'
+    NAME = 'AuthTestUser'
 
     def create_post(self, text, group, author):
         return Post.objects.create(
@@ -116,7 +116,7 @@ class ImageSubscribeCommentCacheTest(TestCase):
 
     def setUp(self):
         self.auth_client = Client()
-        self.auth_user = User.objects.create_user(username=self.Name)
+        self.auth_user = User.objects.create_user(username=self.NAME)
         self.auth_client.force_login(self.auth_user)
         self.auth_client_follower = Client()
         self.auth_user_follower = User.objects.create_user(username='Follower')
@@ -164,7 +164,7 @@ class ImageSubscribeCommentCacheTest(TestCase):
                     data=data,
                     follow=True)
                 for url in (reverse('index'),
-                            reverse('profile', kwargs={'username': self.Name}),
+                            reverse('profile', kwargs={'username': self.NAME}),
                             reverse('group', kwargs={'slug': self.group.slug})):
                     cache.clear()
                     response = self.auth_client.get(url)
@@ -210,7 +210,7 @@ class ImageSubscribeCommentCacheTest(TestCase):
         self.subscribe(user=self.auth_user_follower, author=self.auth_user)
         self.auth_client_follower.get(
             reverse('profile_unfollow',
-                    kwargs={'username': self.Name}),
+                    kwargs={'username': self.NAME}),
             data={'username': self.auth_user_follower.username})
         after_unsubscribe = Follow.objects.count()
         self.assertEqual(before_unsubscribe, after_unsubscribe)
@@ -238,9 +238,9 @@ class ImageSubscribeCommentCacheTest(TestCase):
 
         self.auth_client.post(
             reverse('add_comment',
-                    kwargs={'username': self.Name, 'post_id': post.id}),
+                    kwargs={'username': self.NAME, 'post_id': post.id}),
             data={'text': 'Test comment'})
         response = self.auth_client.get(reverse('post',
-                                                kwargs={'username': self.Name,
+                                                kwargs={'username': self.NAME,
                                                         'post_id': post.id}))
         self.assertContains(response, "Test comment")
