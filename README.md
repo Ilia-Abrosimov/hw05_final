@@ -24,9 +24,8 @@ Yatube – это социальная сеть для публикации ст
 
     $ pip install -r requirements.txt 
 
-Создание и применений миграций БД
+Применение миграций БД
 
-    $ python manage.py makemigrations
     $ python manage.py migrate
 
 Запуск
